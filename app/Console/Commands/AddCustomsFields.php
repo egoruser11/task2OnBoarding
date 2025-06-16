@@ -37,8 +37,9 @@ class AddCustomsFields extends Command
         try {
             if (!$this->kommoService->fieldExists('Date of end lead','leads')) {
                 $result = $this->kommoService->createLeadCloseDateTimeField();
-                $this->info($result);
+               // $this->info($result);
             }
+            $this->info("Поля добавлены");
         } catch (\Exception $e) {
             $this->error("Ошибка: " . $e->getMessage());
             return self::FAILURE;

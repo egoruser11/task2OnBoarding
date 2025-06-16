@@ -21,12 +21,12 @@ class MainController
 
     public function deleteField()
     {
-        $this->kommoService->deleteContactCustomFields([823249,823251,823299,826572]);
+        $this->kommoService->deleteContactCustomFields([843138,823249,823299,823251]);
     }
 
     public function indexFields()
     {
-        return $this->kommoService->findFeildId("leads","Date of end lead");
+        return $this->kommoService->getCustomFieldsNames('contacts');
     }
 
     public function contactsCreate()
@@ -38,14 +38,20 @@ class MainController
     {
         $data = $request->validated();
         $result = [];
-        $result[] =  $this->kommoService->storeContact($data);
+        $result['contact_id'] =  $this->kommoService->storeContact($data);
         $num = mt_rand(1, 9999);
-        $result[] = $this->kommoService->createLeadWithContact('New lead' . " " . "{$num}", $this->kommoService->getLastId("contacts"));
+        $num1 = $num + 1;
+        $leads_ids = [];
+        $leads_ids[] = $this->kommoService->createLeadWithContact('New lead' . " " . "{$num}", $this->kommoService->getLastId("contacts"));
+        $leads_ids[] = $this->kommoService->createLeadWithContact('New lead' . " " . "{$num1}", $this->kommoService->getLastId("contacts"));
+        $result['leads_ids'] = $leads_ids;
         $number1 = mt_rand(0, 99);
         $number2 = mt_rand(0, 99);
         $products = ['продукт номер' . " {$number1}" , 'продукт номер' . " {$number2}"];
-        $result[] = $this->kommoService->attachProductsToLead($this->kommoService->getLastId("leads"), $products);
-        return $result;
+        $attach = $this->kommoService->attachProductsToLead($this->kommoService->getLastId("leads"), $products);
+        $result['products_ids'] = $attach['product_ids'];
+        $result['catalog_id'] = $attach['catalog_id'];
+        return view('result',compact('result'));
     }
 
     public function refresh()

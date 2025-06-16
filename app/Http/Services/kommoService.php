@@ -29,6 +29,11 @@ class kommoService
         ]);
     }
 
+    public function getBaseUrl()
+    {
+        return $this->baseUrl;
+    }
+
     public function refreshTokens()
     {
         try {
@@ -123,6 +128,7 @@ class kommoService
 
     public function getCustomFieldsNames(string $entity, array $query = [])
     {
+
         try {
             $response = $this->client->get("/api/v4/{$entity}/custom_fields");
             $fields = json_decode($response->getBody(), true);
@@ -179,6 +185,20 @@ class kommoService
     {
         try {
             $response = $this->client->get('/api/v4/contacts', [
+                'query' => [
+                ]
+            ]);
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (\GuzzleHttp\Exception\GuzzleException $e) {
+            Log::error('Ошибка при получении пользователей: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function getContact($id)
+    {
+        try {
+            $response = $this->client->get("/api/v4/contacts/{$id}", [
                 'query' => [
                 ]
             ]);
@@ -257,7 +277,7 @@ class kommoService
                     ],
                     'custom_fields_values' => [
                         [
-                            'field_id' => $this->findFeildId('leads','Date of end lead'),
+                            'field_id' => $this->findFeildId('leads', 'Date of end lead'),
                             'values' => [
                                 [
                                     'value' => $closedAt,
@@ -273,11 +293,7 @@ class kommoService
 
             $responseData = json_decode($response->getBody(), true);
             if ($response->getStatusCode() === 200 || $response->getStatusCode() === 201) {
-                return [
-                    'success' => true,
-                    'lead_id' => $responseData['_embedded']['leads'][0]['id'] ?? null,
-                    'message' => 'Deal successfully created'
-                ];
+                return $responseData['_embedded']['leads'][0]['id'];
             } else {
                 Log::error('Failed to create deal: ' . json_encode($responseData));
                 return [
@@ -381,7 +397,7 @@ class kommoService
                         ]
                     ],
                     [
-                        'field_id' => $this->findFeildId('contacts','Age'),
+                        'field_id' => $this->findFeildId('contacts', 'Age'),
                         'values' => [
                             [
                                 'value' => (string)$data['age']
@@ -389,7 +405,7 @@ class kommoService
                         ]
                     ],
                     [
-                        'field_id' => $this->findFeildId('contacts','Male'),
+                        'field_id' => $this->findFeildId('contacts', 'Male'),
                         'values' => [
                             [
                                 'value' => (string)$data['male']
@@ -409,7 +425,7 @@ class kommoService
             ]);
             $responseData = json_decode($response->getBody(), true);
             if ($response->getStatusCode() === 200 || $response->getStatusCode() === 201) {
-                return "Contact successfully created. ID: " . ($responseData['_embedded']['contacts'][0]['id'] ?? 'unknown');
+                return $responseData['_embedded']['contacts'][0]['id'];
             } else {
                 Log::error('Failed to create contact: ' . json_encode($responseData));
                 return "Failed to create contact";
@@ -500,24 +516,30 @@ class kommoService
         if (!$catalogId) {
             return ['success' => false, 'message' => 'Не удалось получить каталог'];
         }
+
         $createdElements = [];
+        $productIds = []; // Массив для хранения ID продуктов
+
         foreach ($products as $product) {
             try {
                 $response = $this->client->post("/api/v4/catalogs/{$catalogId}/elements", [
                     'json' => [
                         [
                             'name' => $product['name'] ?? 'Товар без названия',
-                            'custom_fields_values' => [
-
-                            ]
+                            'custom_fields_values' => []
                         ]
                     ]
                 ]);
+
                 $responseData = json_decode($response->getBody(), true);
+                $elementId = $responseData['_embedded']['elements'][0]['id'];
+
                 $createdElements[] = [
-                    'id' => $responseData['_embedded']['elements'][0]['id'],
+                    'id' => $elementId,
                     'quantity' => $product['quantity'] ?? 1
                 ];
+
+                $productIds[] = $elementId;
 
             } catch (GuzzleException $e) {
                 Log::error('Ошибка создания товара: ' . $e->getMessage());
@@ -527,6 +549,7 @@ class kommoService
                 ];
             }
         }
+
         try {
             $response = $this->client->patch("/api/v4/leads/{$leadId}", [
                 'json' => [
@@ -543,11 +566,15 @@ class kommoService
                     ]
                 ]
             ]);
+
             $responseData = json_decode($response->getBody(), true);
+
             return [
                 'success' => true,
                 'message' => 'Товары успешно прикреплены',
-                'data' => $responseData
+                'data' => $responseData,
+                'catalog_id' => $catalogId,
+                'product_ids' => array_slice($productIds, 0, 2)
             ];
 
         } catch (GuzzleException $e) {
